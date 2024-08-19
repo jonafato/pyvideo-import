@@ -1,0 +1,37 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "pyvideo-import"
+version = "0.0.1"
+dependencies = [
+  "argh",
+  "GitPython",
+  "jq",
+  "python-frontmatter",
+  "python-slugify[unidecode]",
+  "pyyaml",
+  "requests",
+  "yt-dlp",
+]
+requires-python = ">=3.11,<3.12"
+authors = [
+  {name = "Jon Banafato", email = "jon@jonafato.com"},
+]
+description = "Conference-specific importers for PyVideo data"
+readme = "README.md"
+# license = {file = "LICENSE"}
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "Programming Language :: Python"
+]
+
+[project.urls]
+Homepage = "https://jonafato.com"
+Repository = "https://github.com/jonafato/pyvideo-import.git"
+"Bug Tracker" = "https://github.com/jonafato/pyvideo-import/issues"
+# Changelog = "https://github.com/jonafato/pyvideo-import/blob/main/CHANGELOG.md"
+
+[project.scripts]
+pyvideo-import = "pyvideo_import.__main__:__main__"
