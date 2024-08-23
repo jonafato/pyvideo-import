@@ -18,8 +18,9 @@ import yt_dlp
 from thefuzz import fuzz
 
 
-# Use Django's JSONEncoder for some serialization and transformation
-class DjangoJSONEncoder(json.JSONEncoder):
+# Use a trimmed down version of Django's JSONEncoder
+# for some serialization and transformation.
+class JSONEncoder(json.JSONEncoder):
     """
     JSONEncoder subclass that knows how to encode date/time, decimal types, and
     UUIDs.
@@ -37,16 +38,10 @@ class DjangoJSONEncoder(json.JSONEncoder):
         elif isinstance(o, datetime.date):
             return o.isoformat()
         elif isinstance(o, datetime.time):
-            if is_aware(o):
-                raise ValueError("JSON can't represent timezone-aware times.")
             r = o.isoformat()
             if o.microsecond:
                 r = r[:12]
             return r
-        elif isinstance(o, datetime.timedelta):
-            return duration_iso_string(o)
-        elif isinstance(o, (decimal.Decimal, uuid.UUID, Promise)):
-            return str(o)
         else:
             return super().default(o)
 
@@ -61,15 +56,16 @@ class YouTubeLinkBackfiller:
         if not self._data:
             # TODO: this needs some actual logic for caching responses
             # based on URL, not a single global file that must be managed manually.
-            cache_file = "/tmp/ytlbf.json"
-            if Path(cache_file).exists():
-                with open(cache_file) as f:
-                    self._data = json.load(f)
-            else:
-                with yt_dlp.YoutubeDL({"ignoreerrors": True, "quiet": True}) as client:
-                    self._data = client.extract_info(self.url, download=False)
-                with open(cache_file, "w") as f:
-                    json.dump(self._data, f)
+            # TODO: reenable caching of youtube playlist results
+            # cache_file = "/tmp/ytlbf.json"
+            # if Path(cache_file).exists():
+            #     with open(cache_file) as f:
+            #         self._data = json.load(f)
+            # else:
+            with yt_dlp.YoutubeDL({"ignoreerrors": True, "quiet": True}) as client:
+                self._data = client.extract_info(self.url, download=False)
+                # with open(cache_file, "w") as f:
+                #     json.dump(self._data, f)
         return self._data
 
     def backfill_video_url(self, obj: dict[str, Any]) -> dict[str, Any]:
@@ -185,7 +181,7 @@ class BaseTransformer:
             slug = slugify(video_json["title"])
             outfile = (outdir / "videos" / slug).with_suffix(".json")
             with open(outfile, "w") as f:
-                json.dump(video_json, f, indent=4, sort_keys=True, cls=DjangoJSONEncoder)
+                json.dump(video_json, f, indent=4, sort_keys=True, cls=JSONEncoder)
 
     def extract_talk_list(self) -> list[dict[str, Any]]:
         pass
@@ -213,7 +209,7 @@ class JSONTransformer(BaseTransformer):
         if self.talk_list_filter is not None:
             videos = jq.all(
                 self.talk_list_filter,
-                text=json.dumps(videos, cls=DjangoJSONEncoder),
+                text=json.dumps(videos, cls=JSONEncoder),
             )
 
         for video in videos:
@@ -228,7 +224,7 @@ class JSONTransformer(BaseTransformer):
     def transform_talk_json(self, talk_json: dict[str, Any]) -> dict[str, Any]:
         return jq.first(
             self.jq_filter,
-            text=json.dumps(talk_json, cls=DjangoJSONEncoder),
+            text=json.dumps(talk_json, cls=JSONEncoder),
         )
 
 
@@ -251,7 +247,7 @@ class MultiJSONTransformer(BaseTransformer):
     def transform_talk_json(self, talk_json: dict[str, Any]) -> dict[str, Any]:
         return jq.first(
             self.jq_filter,
-            text=json.dumps(talk_json, cls=DjangoJSONEncoder),
+            text=json.dumps(talk_json, cls=JSONEncoder),
         )
 
     def extract_talk_list(self, input_directory: str) -> list[dict[str, Any]]:
