@@ -83,6 +83,7 @@ class YouTubeLinkBackfiller:
                 modified_video_title = modified_video_title.replace(speaker_name, "")
             modified_video_title = re.sub(r"[^\w]", "", modified_video_title).lower()
 
+            # TODO: Make the fuzzy threshold configurable
             if fuzz.ratio(modified_talk_title, modified_video_title) > 75:
                 obj["videos"] = [{
                     "type": "youtube",

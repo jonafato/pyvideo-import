@@ -31,11 +31,12 @@ import pypandoc
 PRETALX_SCHEDULE_WIDGET_TALK_LIST_FILTER = '''
     JOIN(
         INDEX(.speakers[]; .code);
-        .talks[]; (. | if has("speakers") then .speakers[] else "" end);
+        .talks[]; (. | if has("speakers") then .speakers[] else [] end);
         {
-            "title": .[0].title,
-            "speakers": (. | if .[1].name then [.[1].name] else "" end),
             "description": .[0].abstract,
+            "recorded": (.[0].start | strptime("%Y-%m-%dT%H:%M:%S%z") | strftime("%Y-%m-%d")),
+            "speakers": (.[1:] | map(.name)),
+            "title": .[0].title,
         }
     )
 '''
@@ -57,6 +58,9 @@ pycon_uk_2022 = Conference(
             "related_urls": [{"label": "Conference Website", "url": "https://2022.pyconuk.org/"}],
         }
         ''',
+        # PyCon UK 2022 published its videos across three playlists.
+        # We can use multiple backfiller instances to fill in youtube links
+        # based on each playlist.
         postprocess=[
             YouTubeLinkBackfiller(
                 conference_name="PyCon UK 2022",
