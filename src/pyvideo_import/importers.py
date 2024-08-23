@@ -129,12 +129,13 @@ class GitDownloader:
 
 
 class JSONAPIDownloader:
-    def __init__(self, url: str) -> None:
+    def __init__(self, url: str, save_as="response.json") -> None:
         self.url = url
+        self.save_as = save_as
 
     def download(self, directory: str) -> str:
         response = requests.get(self.url)
-        filename = (Path(directory) / "response.json")
+        filename = (Path(directory) / self.save_as)
         with open(filename, "w") as f:
             f.write(response.text)
         return filename
@@ -210,7 +211,7 @@ class JSONTransformer(BaseTransformer):
             videos = self.load(f)
 
         if self.talk_list_filter is not None:
-            videos = jq.first(
+            videos = jq.all(
                 self.talk_list_filter,
                 text=json.dumps(videos, cls=DjangoJSONEncoder),
             )

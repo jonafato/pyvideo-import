@@ -12,6 +12,69 @@ from pyvideo_import.importers import (
 import pypandoc
 
 
+# Some conferences use the schedule widget from pretalx for their schedule
+# and talk list webpages. This means that talk information is not available
+# directly on a conference webpage but gets served via a pretalx widget API.
+# The jq filter below can be used to fetch details for multiple different
+# events.
+#
+#
+# Implementation notes:
+#
+# The default response uses speakers and talks in separate lists. Speakers
+# are referenced by their IDs ("codes") in the talk objects, so we need to
+# match these objects up to make use of them. We use the JOIN and INDEX
+# functions from jq to resolve these relationships. Once those are joined,
+# we can use this canned filter as the talk_list_filter to get the general
+# information we need and fill in event- and talk-specific details in the
+# standard jq_filter step.
+PRETALX_SCHEDULE_WIDGET_TALK_LIST_FILTER = '''
+    JOIN(
+        INDEX(.speakers[]; .code);
+        .talks[]; (. | if has("speakers") then .speakers[] else "" end);
+        {
+            "title": .[0].title,
+            "speakers": (. | if .[1].name then [.[1].name] else "" end),
+            "description": .[0].abstract,
+        }
+    )
+'''
+
+pycon_uk_2022 = Conference(
+    name="PyCon UK 2022",
+    downloader=JSONAPIDownloader(url="https://pretalx.com/pycon-uk-2022/schedule/v/0.4/widgets/schedule.json"),
+    transformer=JSONTransformer(
+        conference_name="PyCon UK 2022",
+        filepath="response.json",
+        # Here we used the canned pretalx filter to combine and reformat the general
+        # shape of the data coming from the pretalx API response.
+        talk_list_filter=PRETALX_SCHEDULE_WIDGET_TALK_LIST_FILTER,
+        # The jq_filter allows us to add additional data such as conference website URLs,
+        # language information, and any other per-conference or per-talk details.
+        jq_filter='''
+        . + {
+            "language": "eng",
+            "related_urls": [{"label": "Conference Website", "url": "https://2022.pyconuk.org/"}],
+        }
+        ''',
+        postprocess=[
+            YouTubeLinkBackfiller(
+                conference_name="PyCon UK 2022",
+                url="https://www.youtube.com/watch?v=YUoKAl6-w5I&list=PLrkpavSsBQZ7tc0-bTaIPKj4rsPFwWtYn",
+            ).backfill_video_url,
+            YouTubeLinkBackfiller(
+                conference_name="PyCon UK 2022",
+                url="https://www.youtube.com/watch?v=mRm9AjnGoBs&list=PLrkpavSsBQZ4ImE1qyyUkHOcRfHD8J5KZ",
+            ).backfill_video_url,
+            YouTubeLinkBackfiller(
+                conference_name="PyCon UK 2022",
+                url="https://www.youtube.com/watch?v=5JeO7nToajk&list=PLrkpavSsBQZ4MmQ6oa27kvMrx7JNzVaBG",
+            ).backfill_video_url,
+        ]
+    )
+)
+
+
 # The PyGotham 2023 site shows an example of transforming a Jekyll site with
 # files stored in a GitLab repository and transforming Frontmatter content
 # into PyVideo's JSON format. The jq filter used here is mostly mapping inputs
@@ -142,7 +205,7 @@ pycon_us_2023 = Conference(
         conference_name="PyCon US 2023",
         filepath="response.json",
         filter_func=lambda talk: talk["kind"] in ["talk", "tutorial", "plenary", "charla", "sponsor-workshop"],
-        talk_list_filter=".schedule",
+        talk_list_filter=".schedule[]",
         jq_filter='''{
             "title": .name,
             "speakers": (. | if has("speakers") then [.speakers[].name] else [] end),
@@ -169,7 +232,7 @@ pycon_us_2024 = Conference(
         conference_name="PyCon US 2024",
         filepath="response.json",
         filter_func=lambda talk: talk["kind"] in ["talk", "tutorial", "plenary", "charla", "sponsor-workshop"],
-        talk_list_filter=".schedule",
+        talk_list_filter=".schedule[]",
         jq_filter='''{
             "title": .name,
             "speakers": (. | if has("speakers") then [.speakers[].name] else [] end),
