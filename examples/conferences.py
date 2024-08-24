@@ -14,50 +14,34 @@ import pypandoc
 
 # Some conferences use the schedule widget from pretalx for their schedule
 # and talk list webpages. This means that talk information is not available
-# directly on a conference webpage but gets served via a pretalx widget API.
-# The jq filter below can be used to fetch details for multiple different
-# events.
-#
-#
-# Implementation notes:
-#
-# The default response uses speakers and talks in separate lists. Speakers
-# are referenced by their IDs ("codes") in the talk objects, so we need to
-# match these objects up to make use of them. We use the JOIN and INDEX
-# functions from jq to resolve these relationships. Once those are joined,
-# we can use this canned filter as the talk_list_filter to get the general
-# information we need and fill in event- and talk-specific details in the
-# standard jq_filter step.
-PRETALX_SCHEDULE_WIDGET_TALK_LIST_FILTER = '''
-    JOIN(
-        INDEX(.speakers[]; .code);
-        .talks[]; (. | if has("speakers") then .speakers[] else [] end);
-        {
-            "description": .[0].abstract,
-            "recorded": (.[0].start | strptime("%Y-%m-%dT%H:%M:%S%z") | strftime("%Y-%m-%d")),
-            "speakers": (.[1:] | map(.name)),
-            "title": .[0].title,
-        }
-    )
-'''
+# directly on a conference webpage but gets served via a pretalx widget and
+# export APIs. The jq filters below can be used to fetch details for
+# multiple different events.
+PRETALX_SCHEDULE_EXPORT_TALK_LIST_FILTER = ".schedule.conference.days[].rooms[][]"
+PRETALX_TALK_TRANSFORM_FILTER = """
+{
+    "description": (.abstract + "\\n\\n" + .description),
+    "recorded": (.date | strptime("%Y-%m-%dT%H:%M:%S%z") | strftime("%Y-%m-%d")),
+    "speakers": [.persons[].public_name],
+    "title": .title,
+}
+"""
 
 pycon_uk_2022 = Conference(
     name="PyCon UK 2022",
-    downloader=JSONAPIDownloader(url="https://pretalx.com/pycon-uk-2022/schedule/v/0.4/widgets/schedule.json"),
+    downloader=JSONAPIDownloader(url="https://pretalx.com/pycon-uk-2022/schedule/export/schedule.json"),
     transformer=JSONTransformer(
         conference_name="PyCon UK 2022",
         filepath="response.json",
         # Here we used the canned pretalx filter to combine and reformat the general
         # shape of the data coming from the pretalx API response.
-        talk_list_filter=PRETALX_SCHEDULE_WIDGET_TALK_LIST_FILTER,
+        talk_list_filter=PRETALX_SCHEDULE_EXPORT_TALK_LIST_FILTER,
         # The jq_filter allows us to add additional data such as conference website URLs,
         # language information, and any other per-conference or per-talk details.
-        jq_filter='''
-        . + {
+        jq_filter=PRETALX_TALK_TRANSFORM_FILTER + """ + {
             "language": "eng",
             "related_urls": [{"label": "Conference Website", "url": "https://2022.pyconuk.org/"}],
-        }
-        ''',
+        }""",
         # PyCon UK 2022 published its videos across three playlists.
         # We can use multiple backfiller instances to fill in youtube links
         # based on each playlist.
